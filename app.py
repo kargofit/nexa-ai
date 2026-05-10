@@ -2,16 +2,33 @@ import os
 import json
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
-from openai import OpenAI
 from ai_coach import SYSTEM_INSTRUCTION
 
 load_dotenv()
 
 app = Flask(__name__)
 
-api_key = os.environ.get("OPENAI_API_KEY")
-if not api_key:
-    print("Warning: OPENAI_API_KEY environment variable is not set. Chat will not work.")
+# --- Provider configuration ---
+# Set AI_PROVIDER=claude to use Anthropic Claude; defaults to openai.
+# Set AI_MODEL to override the default model for the chosen provider.
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "openai").lower()
+
+DEFAULT_MODELS = {
+    "openai": "gpt-4o",
+    "claude": "claude-sonnet-4-5",
+}
+AI_MODEL = os.environ.get("AI_MODEL", DEFAULT_MODELS.get(AI_PROVIDER, "gpt-4o"))
+
+if AI_PROVIDER == "claude":
+    api_key = os.environ.get("CLAUDE_API_KEY")
+    if not api_key:
+        print("Warning: CLAUDE_API_KEY environment variable is not set. Chat will not work.")
+else:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("Warning: OPENAI_API_KEY environment variable is not set. Chat will not work.")
+
+print(f"AI Provider: {AI_PROVIDER.upper()} | Model: {AI_MODEL}")
 
 # Initialize global client and conversation history
 client = None
@@ -19,7 +36,12 @@ conversation_history = []
 
 if api_key:
     try:
-        client = OpenAI(api_key=api_key)
+        if AI_PROVIDER == "claude":
+            from anthropic import Anthropic
+            client = Anthropic(api_key=api_key)
+        else:
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
         conversation_history = [
             {"role": "system", "content": SYSTEM_INSTRUCTION}
         ]
@@ -45,32 +67,28 @@ def chat():
     
     try:
         conversation_history.append({"role": "user", "content": user_message})
-        
-        messages_for_api = conversation_history.copy()
-        # Ensure we request JSON format for the UI to parse nudges
-        messages_for_api[0] = {
-            "role": "system",
-            "content": SYSTEM_INSTRUCTION + "\n\nIMPORTANT: You must respond in JSON format with two keys: 'reply' (your actual response formatted in markdown, without the follow-up questions at the end) and 'nudges'. The 'nudges' key must be an array of 2-3 objects, each representing a suggested follow-up. Each object must have 'category' (the top-level coaching category), 'subcategory' (the specific coaching subcategory from the prompt), and 'text' (a short actionable question or statement, max 10 words, that the user can click as their next reply)."
-        }
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages_for_api,
-            temperature=0.7,
-            response_format={ "type": "json_object" }
-        )
-        
-        response_content = response.choices[0].message.content
-        try:
-            parsed_response = json.loads(response_content)
-            reply = parsed_response.get('reply', response_content)
-            nudges = parsed_response.get('nudges', [])
-        except json.JSONDecodeError:
-            reply = response_content
-            nudges = []
+        if AI_PROVIDER == "claude":
+            # Anthropic API: system prompt is separate; messages exclude system role
+            messages_for_api = [m for m in conversation_history if m["role"] != "system"]
+            response = client.messages.create(
+                model=AI_MODEL,
+                max_tokens=1024,
+                system=SYSTEM_INSTRUCTION,
+                messages=messages_for_api,
+            )
+            reply = response.content[0].text
+        else:
+            messages_for_api = conversation_history.copy()
+            response = client.chat.completions.create(
+                model=AI_MODEL,
+                messages=messages_for_api,
+                temperature=0.7,
+            )
+            reply = response.choices[0].message.content
 
         conversation_history.append({"role": "assistant", "content": reply})
-        return jsonify({'response': reply, 'nudges': nudges})
+        return jsonify({'response': reply})
     except Exception as e:
         if conversation_history and conversation_history[-1]["role"] == "user":
             conversation_history.pop()

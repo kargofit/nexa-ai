@@ -17,10 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const message = userInput.value.trim();
         if (!message) return;
 
-        // Remove existing nudges if any
-        const existingNudges = document.querySelectorAll('.nudges-container');
-        existingNudges.forEach(el => el.remove());
-
         // Add user message to UI
         addMessage(message, 'user');
         userInput.value = '';
@@ -43,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
             removeElement(typingIndicatorId);
 
             if (response.ok) {
-                addMessage(data.response, 'assistant', data.nudges);
+                addMessage(data.response, 'assistant');
             } else {
                 addMessage(`Error: ${data.error}`, 'assistant');
             }
@@ -53,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function addMessage(text, sender, nudges = []) {
+    function addMessage(text, sender) {
         const wrapper = document.createElement('div');
         wrapper.className = `message-wrapper ${sender}`;
 
@@ -73,34 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.appendChild(avatar);
         wrapper.appendChild(messageDiv);
         chatContainer.appendChild(wrapper);
-        
-        if (nudges && nudges.length > 0) {
-            const nudgesContainer = document.createElement('div');
-            nudgesContainer.className = 'nudges-container';
-            
-            nudges.forEach(nudge => {
-                const button = document.createElement('button');
-                button.className = 'nudge-button';
-                
-                let nudgeText = '';
-                if (typeof nudge === 'string') {
-                    // Fallback for older format
-                    nudgeText = nudge;
-                    button.textContent = nudgeText;
-                } else {
-                    nudgeText = nudge.text || nudge.subcategory;
-                    button.innerHTML = `<span class="nudge-category">${nudge.category} &rsaquo; ${nudge.subcategory}</span><br/>${nudgeText}`;
-                }
-                
-                button.onclick = () => {
-                    userInput.value = nudgeText;
-                    chatForm.dispatchEvent(new Event('submit'));
-                };
-                nudgesContainer.appendChild(button);
-            });
-            
-            chatContainer.appendChild(nudgesContainer);
-        }
         
         scrollToBottom();
     }
