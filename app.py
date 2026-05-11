@@ -51,6 +51,10 @@ if api_key:
 
 @app.route('/')
 def index():
+    global conversation_history
+    conversation_history = [
+        {"role": "system", "content": SYSTEM_INSTRUCTION}
+    ]
     return render_template('index.html')
 
 @app.route('/chat', methods=['POST'])
