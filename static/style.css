@@ -298,7 +298,6 @@ body {
 }
 
 /* Markdown styling within messages */
-.message strong { color: #fff; }
 .message ul, .message ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
 .message li { margin-bottom: 0.25rem; }
 .message h1, .message h2, .message h3 { margin-bottom: 0.75rem; font-weight: 600; margin-top: 1rem; }
