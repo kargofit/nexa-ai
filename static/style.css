@@ -56,7 +56,7 @@ body {
 }
 
 .app-header {
-    padding: 20px 24px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--glass-border);
     display: flex;
     justify-content: space-between;
